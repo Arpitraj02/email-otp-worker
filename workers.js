@@ -1,4 +1,4 @@
-import { PostalMime } from 'postal-mime';
+import PostalMime from 'postal-mime';
 
 // ----- OTP extractor -----
 function extractOTP(text) {
