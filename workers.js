@@ -26,34 +26,34 @@ export default {
         const url = new URL(request.url);
         const path = url.pathname;
 
-        // ----- GET / – welcome message -----
+        // ----- GET / – welcome -----
         if (path === '/') {
             return new Response(JSON.stringify({
-                message: 'nigga hunter mail API active 🌚',
+                message: 'nigga hunter mail API active 🎯',
                 version: '1.0.0',
                 endpoints: {
-                    setup: '/setup (POST once)',
+                    setup: '/setup (call once to create DB)',
                     all: '/all (list all emails)',
-                    inbox: '/inbox/<email> (get emails for a specific address)',
-                    health: '/health (status check)'
+                    inbox: '/inbox/<email>',
+                    health: '/health'
                 }
             }), {
                 headers: { 'Content-Type': 'application/json' }
             });
         }
 
-        // ----- GET /health – health check -----
+        // ----- GET /health – status -----
         if (path === '/health') {
             return new Response(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }), {
                 headers: { 'Content-Type': 'application/json' }
             });
         }
 
-        // ----- /setup – one‑time schema creation -----
+        // ----- /setup – create schema using prepare().run() -----
         if (path === '/setup') {
             try {
-                await env.DB.exec(`
-                    CREATE TABLE IF NOT EXISTS emails (
+                await env.DB.prepare(
+                    `CREATE TABLE IF NOT EXISTS emails (
                         id TEXT PRIMARY KEY,
                         recipient TEXT NOT NULL,
                         sender TEXT,
@@ -61,11 +61,11 @@ export default {
                         text_body TEXT,
                         html_body TEXT,
                         received_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    )
-                `);
-                await env.DB.exec(`
-                    CREATE INDEX IF NOT EXISTS idx_recipient ON emails(recipient)
-                `);
+                    )`
+                ).run();
+                await env.DB.prepare(
+                    `CREATE INDEX IF NOT EXISTS idx_recipient ON emails(recipient)`
+                ).run();
                 return new Response(JSON.stringify({ success: true, message: 'Schema created' }), {
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -77,7 +77,7 @@ export default {
             }
         }
 
-        // ----- /all – returns all emails (latest 200) with OTP -----
+        // ----- /all – get all emails (latest 200) -----
         if (path === '/all') {
             const { results } = await env.DB.prepare(
                 `SELECT * FROM emails ORDER BY received_at DESC LIMIT 200`
@@ -95,7 +95,7 @@ export default {
             });
         }
 
-        // ----- /inbox/<email> – filter by recipient -----
+        // ----- /inbox/<email> -----
         const match = path.match(/^\/inbox\/(.+)$/);
         if (match) {
             const emailAddress = match[1];
