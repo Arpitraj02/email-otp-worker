@@ -1,6 +1,5 @@
 import PostalMime from 'postal-mime';
 
-// ----- OTP extractor -----
 function extractOTP(text) {
     if (!text) return null;
     const patterns = [
@@ -27,11 +26,34 @@ export default {
         const url = new URL(request.url);
         const path = url.pathname;
 
+        // ----- GET / – welcome message -----
+        if (path === '/') {
+            return new Response(JSON.stringify({
+                message: 'nigga hunter mail API active 🌚',
+                version: '1.0.0',
+                endpoints: {
+                    setup: '/setup (POST once)',
+                    all: '/all (list all emails)',
+                    inbox: '/inbox/<email> (get emails for a specific address)',
+                    health: '/health (status check)'
+                }
+            }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
+        // ----- GET /health – health check -----
+        if (path === '/health') {
+            return new Response(JSON.stringify({ status: 'ok', timestamp: new Date().toISOString() }), {
+                headers: { 'Content-Type': 'application/json' }
+            });
+        }
+
         // ----- /setup – one‑time schema creation -----
         if (path === '/setup') {
             try {
-                await env.DB.exec(
-                    `CREATE TABLE IF NOT EXISTS emails (
+                await env.DB.exec(`
+                    CREATE TABLE IF NOT EXISTS emails (
                         id TEXT PRIMARY KEY,
                         recipient TEXT NOT NULL,
                         sender TEXT,
@@ -39,9 +61,11 @@ export default {
                         text_body TEXT,
                         html_body TEXT,
                         received_at DATETIME DEFAULT CURRENT_TIMESTAMP
-                    );
-                    CREATE INDEX IF NOT EXISTS idx_recipient ON emails(recipient);`
-                );
+                    )
+                `);
+                await env.DB.exec(`
+                    CREATE INDEX IF NOT EXISTS idx_recipient ON emails(recipient)
+                `);
                 return new Response(JSON.stringify({ success: true, message: 'Schema created' }), {
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -95,7 +119,6 @@ export default {
         return new Response('Not found', { status: 404 });
     },
 
-    // ----- Email handler (called by Cloudflare Email Routing) -----
     async email(message, env, ctx) {
         const parser = new PostalMime();
         const email = await parser.parse(message.raw);
